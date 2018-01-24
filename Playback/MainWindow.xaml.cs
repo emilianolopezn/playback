@@ -15,6 +15,7 @@ using System.Windows.Shapes;
 using Microsoft.Win32;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using System.Windows.Threading;
 
 namespace Playback
 {
@@ -23,22 +24,38 @@ namespace Playback
     /// </summary>
     public partial class MainWindow : Window
     {
+
         private Mp3FileReader reader;
         private WaveOut output;
+        DispatcherTimer timer;
+        bool dragging = false;
 
         public MainWindow()
         {
             InitializeComponent();
+            timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromMilliseconds(1000);
+            timer.Tick += OnTimerTick;
         }
+
+        private void OnTimerTick(object sender, EventArgs e)
+        {
+            if (reader != null && !dragging)
+            {
+                lblPosition.Text = reader.CurrentTime.ToString();
+                sldPosition.Value = reader.CurrentTime.TotalSeconds;
+            }
+        }
+
 
         private void btnBuscar_Click(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog openFileDialog =
-                new OpenFileDialog();
+            OpenFileDialog openFileDialog = new OpenFileDialog();
 
             if (openFileDialog.ShowDialog() == true)
             {
                 txtRuta.Text = openFileDialog.FileName;
+
             }
         }
 
@@ -49,19 +66,34 @@ namespace Playback
                 output = new WaveOut();
                 output.PlaybackStopped += OnPlaybackStop;
                 reader = new Mp3FileReader(txtRuta.Text);
+
                 output.Init(reader);
                 output.Play();
-            } else
-            {
-                //Avisarle al usuario que elija un archivo
+
+                btnStop.IsEnabled = true;
+                btnPlay.IsEnabled = false;
+
+                lblDuration.Text = reader.TotalTime.ToString();
+                lblPosition.Text = reader.CurrentTime.ToString();
+                sldPosition.Maximum = reader.TotalTime.TotalSeconds;
+                sldPosition.Value = 0;
+
+                timer.Start();
+
+
+
             }
-            
+            else
+            {
+                //Avisarle al suuario que elija un archivo
+            }
         }
 
         private void OnPlaybackStop(object sender, StoppedEventArgs e)
         {
             reader.Dispose();
             output.Dispose();
+            timer.Stop();
         }
 
         private void btnStop_Click(object sender, RoutedEventArgs e)
@@ -69,7 +101,29 @@ namespace Playback
             if (output != null)
             {
                 output.Stop();
+                btnPlay.IsEnabled = true;
+                btnStop.IsEnabled = false;
             }
         }
+
+       
+
+        private void sldPosition_dragCompleted(object sender, RoutedEventArgs e)
+        {
+            if (reader != null)
+            {
+                reader.CurrentTime = TimeSpan.FromSeconds(sldPosition.Value);
+                dragging = false;
+            }
+        }
+
+        private void sldPostion_dragStarted(object sender, RoutedEventArgs e)
+        {
+            if (reader != null)
+            {
+                dragging = true;
+            }
+        }
+
     }
 }
